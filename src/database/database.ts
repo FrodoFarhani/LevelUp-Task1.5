@@ -28,8 +28,8 @@ class Database {
 			logger.error("Unexpected error on idle client", err);
 			process.exit(-1);
 		});
-
 		const client = await pool.connect();
+
 		return client;
 	}
 
@@ -40,8 +40,9 @@ class Database {
 			result = await client.query(query);
 		} catch (error) {
 			logger.error(error);
-		} finally {
 			client.release();
+		} finally {
+			await client.release();
 		}
 		return result;
 	}

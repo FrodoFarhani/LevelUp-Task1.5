@@ -9,4 +9,3 @@ Thumbs.db
 *.log
 yarn.lock
 coverage/
-dist

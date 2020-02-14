@@ -1,0 +1,1 @@
+{"version":3,"file":"prod.js","sourceRoot":"","sources":["../../src/config/prod.ts"],"names":[],"mappings":";;AAEA,MAAM,QAAQ;IACb,IAAI;QACH,OAAO;YACN,UAAU,EAAE,gDAAgD;SAC5D,CAAC;IACH,CAAC;CACD;AACD,kBAAe,IAAI,QAAQ,EAAE,CAAC"}
