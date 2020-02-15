@@ -1,9 +1,7 @@
-/* eslint-disable no-undef */
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-empty-function */
-/* eslint-disable no-await-in-loop */
 /* eslint-disable no-plusplus */
-import Database from "../database/database";
+import { PoolClient } from "pg";
+import logger from "../libs/logger";
+import * as Database from "../database/database";
 
 class InitializeDb {
 	private customerRange: number;
@@ -22,98 +20,148 @@ class InitializeDb {
 		productCount = 100,
 		sourceFree = 5,
 		sourcePremium = 5,
-		offerCount = 10000
+		offerCount = 20000
 	) {
 		this.customerRange = customerRange;
 		this.productCount = productCount;
 		this.sourceFree = sourceFree;
 		this.sourcePremium = sourcePremium;
 		this.offerCount = offerCount;
-		this.initializeDb();
+		this.createTables();
+		this.insertData();
 	}
 
-	private async initializeDb(): Promise<void> {
-		await this.customerData();
-		await this.sourceData();
-		await this.productData();
-		await this.offerData();
+	private async insertData(): Promise<void> {
+		await this.InsertCustomerData();
+		await this.InsertSourceData();
+		await this.InsertProductData();
+		await this.InsertOfferData();
 	}
 
-	private async customerData(): Promise<void> {
-		await this.db.query("DROP TABLE CUSTOMER;");
-		const tblCustomer =
+	async truncateData(): Promise<void> {
+		const singleData: string[][] = [];
+		const client: PoolClient = await this.db.getTransaction();
+
+		const CUSTOMER = "TRUNCATE TABLE CUSTOMER;";
+		const SOURCE = "TRUNCATE TABLE SOURCE;";
+		const PRODUCT = "TRUNCATE TABLE PRODUCT;";
+		const OFFER = "TRUNCATE TABLE OFFER;";
+
+		try {
+			await this.db.sqlExecSingleRow(client, CUSTOMER, singleData);
+			await this.db.sqlExecSingleRow(client, SOURCE, singleData);
+			await this.db.sqlExecSingleRow(client, PRODUCT, singleData);
+			await this.db.sqlExecSingleRow(client, OFFER, singleData);
+			await this.db.commit(client);
+		} catch (error) {
+			await this.db.rollback(client);
+			logger.error(`sampleTransactionModel error: ${error.message}`);
+			throw new Error(error.message);
+		}
+	}
+
+	async createTables(): Promise<void> {
+		const singleData: string[][] = [];
+		const client: PoolClient = await this.db.getTransaction();
+
+		const CUSTOMER =
 			"CREATE TABLE CUSTOMER (ID SERIAL PRIMARY KEY  NOT NULL, NAME TEXT NOT NULL, PR_SOURCES TEXT);";
-		await this.db.query(tblCustomer);
+		const SOURCE =
+			"CREATE TABLE SOURCE (ID SERIAL PRIMARY KEY  NOT NULL, NAME TEXT NOT NULL, TYPE INT NOT NULL);";
+		const PRODUCT =
+			"CREATE TABLE PRODUCT (ID SERIAL PRIMARY KEY NOT NULL, NAME TEXT NOT NULL, CUSTOMER_ID INT REFERENCES CUSTOMER (ID) ON DELETE RESTRICT NOT NULL);";
+		const OFFER =
+			"CREATE TABLE OFFER (ID SERIAL PRIMARY KEY NOT NULL, PRODUCT_ID INT REFERENCES PRODUCT (ID) ON DELETE RESTRICT NOT NULL, SOURCE_ID INT REFERENCES SOURCE (ID) ON DELETE RESTRICT NOT NULL, ORDER_NUM INT);";
+
+		try {
+			await this.db.sqlExecSingleRow(client, CUSTOMER, singleData);
+			await this.db.sqlExecSingleRow(client, SOURCE, singleData);
+			await this.db.sqlExecSingleRow(client, PRODUCT, singleData);
+			await this.db.sqlExecSingleRow(client, OFFER, singleData);
+			await this.db.commit(client);
+		} catch (error) {
+			await this.db.rollback(client);
+			logger.error(`sampleTransactionModel error: ${error.message}`);
+			throw new Error(error.message);
+		}
+	}
+
+	private async InsertCustomerData(): Promise<void> {
+		let insertStr = "INSERT INTO CUSTOMER VALUES ";
+		const client: PoolClient = await this.db.getTransaction();
 
 		for (let i = 0; i < this.customerRange; i++) {
-			await this.db.query(
-				`INSERT INTO CUSTOMER (ID,NAME,PR_SOURCES) VALUES (DEFAULT,'customer_${i +
-					1}', '')`
-			);
-			console.log("customer:", i);
-			await this.sleep(200);
+			insertStr += `(DEFAULT, 'customer_${i + 1}',''),`;
+		}
+		try {
+			await this.db.sqlExecMultipleRows(client, insertStr.slice(0, -1));
+			await this.db.commit(client);
+		} catch (error) {
+			await this.db.rollback(client);
+			logger.error(`sampleTransactionModel error: ${error.message}`);
+			throw new Error(error.message);
 		}
 	}
 
-	private async sourceData(): Promise<void> {
-		await this.db.query("DROP TABLE SOURCE;");
-		const tblSource =
-			"CREATE TABLE SOURCE (ID SERIAL PRIMARY KEY  NOT NULL, NAME TEXT NOT NULL, TYPE INT NOT NULL);";
-		await this.db.query(tblSource);
+	private async InsertSourceData(): Promise<void> {
+		let insertStr = "INSERT INTO SOURCE (ID,NAME,TYPE) VALUES ";
+
+		const client: PoolClient = await this.db.getTransaction();
 
 		for (let i = 0; i < this.sourceFree; i++) {
-			await this.db.query(
-				`INSERT INTO SOURCE (ID,NAME,TYPE) VALUES (DEFAULT,'source_free_${i +
-					1}', 0)`
-			);
-			console.log("source free:", i);
-			await this.sleep(200);
+			insertStr += `(DEFAULT,'source_free_${i + 1}', 0),`;
 		}
 		for (let i = 0; i < this.sourcePremium; i++) {
-			await this.db.query(
-				`INSERT INTO SOURCE (ID,NAME,TYPE) VALUES (DEFAULT,'source_premium_${i +
-					1}', 1)`
-			);
-			console.log("source premium:", i);
-			await this.sleep(200);
+			insertStr += `(DEFAULT,'source_premium_${i + 1}', 1),`;
+		}
+		try {
+			await this.db.sqlExecMultipleRows(client, insertStr.slice(0, -1));
+			await this.db.commit(client);
+		} catch (error) {
+			await this.db.rollback(client);
+			logger.error(`sampleTransactionModel error: ${error.message}`);
+			throw new Error(error.message);
 		}
 	}
 
-	private async productData(): Promise<void> {
-		await this.db.query("DROP TABLE PRODUCT;");
-		const tblProduct =
-			"CREATE TABLE PRODUCT (ID SERIAL PRIMARY KEY NOT NULL, NAME TEXT NOT NULL, CUSTOMER_ID INT REFERENCES CUSTOMER (ID) ON DELETE RESTRICT NOT NULL);";
-		await this.db.query(tblProduct);
+	private async InsertProductData(): Promise<void> {
+		let insertStr = "INSERT INTO PRODUCT (ID,NAME,CUSTOMER_ID) VALUES ";
+
+		const client: PoolClient = await this.db.getTransaction();
 
 		for (let i = 0; i < this.productCount; i++) {
-			await this.db.query(
-				`INSERT INTO PRODUCT (ID,NAME,CUSTOMER_ID) VALUES (DEFAULT, 'product_${i +
-					1}', ${this.randomNumber(this.customerRange)})`
-			);
-			console.log("product:", i);
-			await this.sleep(200);
+			insertStr += `(DEFAULT, 'product_${i + 1}', ${this.randomNumber(
+				this.customerRange
+			)}),`;
+		}
+		try {
+			await this.db.sqlExecMultipleRows(client, insertStr.slice(0, -1));
+			await this.db.commit(client);
+		} catch (error) {
+			await this.db.rollback(client);
+			logger.error(`sampleTransactionModel error: ${error.message}`);
+			throw new Error(error.message);
 		}
 	}
 
-	private async offerData(): Promise<void> {
-		await this.db.query("DROP TABLE OFFER;");
-		const tblOffer =
-			"CREATE TABLE OFFER (ID SERIAL PRIMARY KEY NOT NULL, PRODUCT_ID INT REFERENCES PRODUCT (ID) ON DELETE RESTRICT NOT NULL, SOURCE_ID INT REFERENCES SOURCE (ID) ON DELETE RESTRICT NOT NULL, ORDER_NUM INT);";
-		await this.db.query(tblOffer);
+	private async InsertOfferData(): Promise<void> {
+		const client: PoolClient = await this.db.getTransaction();
+		let insertStr =
+			"INSERT INTO OFFER (ID, PRODUCT_ID, SOURCE_ID, ORDER_NUM) VALUES ";
 
 		for (let i = 0; i < this.offerCount; i++) {
-			await this.db.query(
-				`INSERT INTO OFFER (ID, PRODUCT_ID, SOURCE_ID, ORDER_NUM) VALUES (DEFAULT, ${this.randomNumber(
-					this.productCount
-				)}, ${this.randomNumber(this.sourceFree + this.sourcePremium)},NULL)`
-			);
-			console.log("offer:", i);
-			await this.sleep(200);
+			insertStr += `(DEFAULT, ${this.randomNumber(
+				this.productCount
+			)}, ${this.randomNumber(this.sourceFree + this.sourcePremium)},NULL),`;
 		}
-	}
-
-	private async sleep(millis: number) {
-		return new Promise(resolve => setTimeout(resolve, millis));
+		try {
+			await this.db.sqlExecMultipleRows(client, insertStr.slice(0, -1));
+			await this.db.commit(client);
+		} catch (error) {
+			await this.db.rollback(client);
+			logger.error(`sampleTransactionModel error: ${error.message}`);
+			throw new Error(error.message);
+		}
 	}
 
 	private randomNumber(max: number): number {
