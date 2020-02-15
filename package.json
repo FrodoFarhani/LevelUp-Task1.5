@@ -6,7 +6,7 @@
   "author": "so0oshiance <mohamad.farhany@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "initdb": "tsc && node dist/factory/initializeDb.js",
+    "initdb": "tsc && node dist/factory/index.js",
     "build": "lint tsc copy-assets",
     "start": "tsc && node dist/index.js",
     "lint": "eslint . --cache --fix --ext .ts,.tsx",
