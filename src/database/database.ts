@@ -3,6 +3,8 @@ import * as pg from "pg";
 import logger from "../libs/logger";
 import config from "../config/config";
 
+const QueryStream = require("pg-query-stream");
+
 const pool = new pg.Pool({
 	connectionString: config.POSTGREURL
 });
@@ -12,6 +14,15 @@ logger.info(`DB Connection Settings: ${config.POSTGREURL}`);
 pool.on("error", (err: Error) => {
 	logger.error(`idle client error, ${err.message} | ${err.stack}`);
 });
+
+export const streamRead = async (sql: string) => {
+	const client = new pg.Client(config.POSTGREURL);
+	client.connect();
+	const result = client.query(new QueryStream(sql));
+
+	logger.info(`DB Connected with URI: ${config.POSTGREURL}`);
+	return result;
+};
 
 export const sqlToDB = async (sql: string, data: string[][]) => {
 	logger.info(`sqlToDB() sql: ${sql} | data: ${data}`);
@@ -57,7 +68,7 @@ export const sqlExecSingleRow = async (
 	try {
 		result = await client.query(sql, data);
 		logger.info(`sqlExecSingleRow(): ${result.command} | ${result.rowCount}`);
-		return result;
+		return result.rows;
 	} catch (error) {
 		logger.error(
 			`sqlExecSingleRow() error: ${error.message} | sql: ${sql} | data: ${data}`

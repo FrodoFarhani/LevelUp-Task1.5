@@ -1,7 +1,6 @@
-// import Database from "./database/database";
+import logger from "./libs/logger";
+import updateHandler from "./handlers/updateHandler";
 
-const fn = async () => {
-	// const res = await Database.query("SELECT * from  test");
-	// console.log(res.rows[0]);
-};
-fn();
+updateHandler()
+	.then(result => logger.info(result))
+	.catch(error => logger.error(error));

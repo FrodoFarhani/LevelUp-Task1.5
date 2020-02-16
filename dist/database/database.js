@@ -16,32 +16,27 @@ var __importDefault =
 		return mod && mod.__esModule ? mod : { default: mod };
 	};
 Object.defineProperty(exports, "__esModule", { value: true });
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable no-await-in-loop */
 /* eslint-disable no-var */
 const pg = __importStar(require("pg"));
-const prod_1 = __importDefault(require("../config/prod"));
-const dev_1 = __importDefault(require("../config/dev"));
-const keys_1 = require("../config/keys");
 const logger_1 = __importDefault(require("../libs/logger"));
-function properKey() {
-	let keysObject;
-	if (process.env.NODE_ENV === "production") {
-		keysObject = new keys_1.ProperKeys(prod_1.default).keys();
-	} else {
-		keysObject = new keys_1.ProperKeys(dev_1.default).keys();
-	}
-	return keysObject.postGreURI;
-}
+const config_1 = __importDefault(require("../config/config"));
+const QueryStream = require("pg-query-stream");
 const pool = new pg.Pool({
-	connectionString: "postgresql://mof:123@localhost:5432/StreamData"
+	connectionString: config_1.default.POSTGREURL
 });
-logger_1.default.info(
-	`DB Connection Settings: ${JSON.stringify(properKey.toString())}`
-);
+logger_1.default.info(`DB Connection Settings: ${config_1.default.POSTGREURL}`);
 pool.on("error", err => {
 	logger_1.default.error(`idle client error, ${err.message} | ${err.stack}`);
 });
+exports.streamRead = async sql => {
+	const client = new pg.Client(config_1.default.POSTGREURL);
+	client.connect();
+	const result = client.query(new QueryStream(sql));
+	logger_1.default.info(
+		`DB Connected with URI: ${config_1.default.POSTGREURL}`
+	);
+	return result;
+};
 exports.sqlToDB = async (sql, data) => {
 	logger_1.default.info(`sqlToDB() sql: ${sql} | data: ${data}`);
 	let result;
@@ -82,7 +77,7 @@ exports.sqlExecSingleRow = async (client, sql, data) => {
 		logger_1.default.info(
 			`sqlExecSingleRow(): ${result.command} | ${result.rowCount}`
 		);
-		return result;
+		return result.rows;
 	} catch (error) {
 		logger_1.default.error(
 			`sqlExecSingleRow() error: ${error.message} | sql: ${sql} | data: ${data}`
