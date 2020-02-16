@@ -36,14 +36,15 @@ export default class UpdateOffer {
 
 		stream
 			.on("data", async (data: { source_id: number }) => {
+				stream.pause();
 				await this.updateOffers(data.source_id, productId);
 				await this.sleep();
+				stream.resume();
 			})
 			.on("error", (error: Error) => logger.error(error.message))
-			.on("end", async () => {
+			.on("end", () => {
 				if (productId <= this.TblProductCount) {
 					this.queryOffers(++productId);
-					await this.sleep();
 				}
 				Promise.resolve("Done!");
 			});
@@ -59,27 +60,27 @@ export default class UpdateOffer {
 
 		stream
 			.on("data", async (data: { source_id: number; id: number }) => {
+				stream.pause();
 				if (this.TblSourceFreeIds.includes(data.source_id)) {
 					await Database.sqlExecMultipleRows(
 						poolClient,
-						`UPDATE TABLE offer SET  order_num=${++orderCount} WHERE id=${
-							data.id
-						}`
+						`UPDATE  offer SET  order_num=${++orderCount} WHERE id=${data.id}`
 					);
 				} else {
 					await Database.sqlExecMultipleRows(
 						poolClient,
-						`UPDATE TABLE offer SET  order_num=0 WHERE id=${data.id}`
+						`UPDATE  offer SET  order_num=0 WHERE id=${data.id}`
 					);
 				}
-				await Database.commit(poolClient);
 				await this.sleep();
+				stream.resume();
 			})
 			.on("error", (error: Error) => logger.error(error.message))
-			.on("end", () => {
+			.on("end", async () => {
 				if (sourceId <= this.TblSourceCount) {
 					this.updateOffers(++sourceId, productId);
 				}
+				await Database.commit(poolClient);
 				Promise.resolve("Done!");
 			});
 	}
@@ -88,7 +89,7 @@ export default class UpdateOffer {
 		return new Promise(function(resolve) {
 			setTimeout(function() {
 				resolve();
-			}, 300);
+			}, 3000);
 		});
 	}
 }
