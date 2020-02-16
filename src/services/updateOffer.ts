@@ -41,7 +41,10 @@ export default class UpdateOffer {
 				await this.sleep();
 				stream.resume();
 			})
-			.on("error", (error: Error) => logger.error(error.message))
+			.on("error", (error: Error) => {
+				logger.error(error.message);
+				throw new Error(error.message);
+			})
 			.on("end", () => {
 				if (productId <= this.TblProductCount) {
 					this.queryOffers(++productId);
@@ -51,9 +54,6 @@ export default class UpdateOffer {
 	}
 
 	private async updateOffers(sourceId = 1, productId = 1) {
-		const poolClient: pg.PoolClient = await Database.getTransaction();
-		let orderCount = 0;
-
 		const stream = await Database.streamRead(
 			`SELECT * FROM offer WHERE product_id=${productId} and source_id=${sourceId}`
 		);
@@ -61,35 +61,44 @@ export default class UpdateOffer {
 		stream
 			.on("data", async (data: { source_id: number; id: number }) => {
 				stream.pause();
-				if (this.TblSourceFreeIds.includes(data.source_id)) {
-					await Database.sqlExecMultipleRows(
-						poolClient,
-						`UPDATE  offer SET  order_num=${++orderCount} WHERE id=${data.id}`
-					);
-				} else {
-					await Database.sqlExecMultipleRows(
-						poolClient,
-						`UPDATE  offer SET  order_num=0 WHERE id=${data.id}`
-					);
-				}
+				await this.updateOneOffer(data);
 				await this.sleep();
 				stream.resume();
 			})
-			.on("error", (error: Error) => logger.error(error.message))
+			.on("error", (error: Error) => {
+				logger.error(error.message);
+				throw new Error(error.message);
+			})
 			.on("end", async () => {
 				if (sourceId <= this.TblSourceCount) {
 					this.updateOffers(++sourceId, productId);
 				}
-				await Database.commit(poolClient);
-				Promise.resolve("Done!");
 			});
+	}
+
+	private async updateOneOffer(data: { source_id: number; id: number }) {
+		const poolClient: pg.PoolClient = await Database.getTransaction();
+		let orderCount = 0;
+
+		if (this.TblSourceFreeIds.includes(data.source_id)) {
+			await Database.sqlExecMultipleRows(
+				poolClient,
+				`UPDATE  offer SET  order_num=${++orderCount} WHERE id=${data.id}`
+			);
+		} else {
+			await Database.sqlExecMultipleRows(
+				poolClient,
+				`UPDATE  offer SET  order_num=0 WHERE id=${data.id}`
+			);
+		}
+		await Database.commit(poolClient);
 	}
 
 	private async sleep() {
 		return new Promise(function(resolve) {
 			setTimeout(function() {
 				resolve();
-			}, 3000);
+			}, 300);
 		});
 	}
 }
