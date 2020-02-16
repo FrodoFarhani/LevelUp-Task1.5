@@ -36,7 +36,7 @@ exports.sourceFreeIds = async () => {
 	const sourceObj = await sourceSelect();
 	const freeSourceIds = sourceObj.map(item => {
 		if (item.type == 0) return item.id;
-		else return 0;
+		return 0;
 	});
 	return freeSourceIds;
 };
